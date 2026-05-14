@@ -58,15 +58,15 @@ st.markdown('<p class="main-title">Gestão de Convites Express</p>', unsafe_allo
 
 with st.sidebar:
     st.header("🎨 Identidade")
-    # Aqui é onde você define se é Aniversário, Homenagem, etc.
+    # Agora os campos começam vazios ("")
     tipo_evento_input = st.text_input("Qual é o evento?", value="Aniversário")
-    homenageado_input = st.text_input("Homenageado", value="Luiz")
-    wa_gestora = st.text_input("WhatsApp da Gestora (Ex: 55629...)")
+    homenageado_input = st.text_input("Homenageado", value="", placeholder="Digite o nome aqui...")
+    wa_gestora = st.text_input("WhatsApp da Gestora", value="", placeholder="55629...")
     data_evento = st.date_input("Data do Evento")
 
 arquivo_csv = st.file_uploader("📊 Carregue a Lista de Convidados (CSV)", type=["csv"])
 
-if arquivo_csv and wa_gestora:
+if arquivo_csv and wa_gestora and homenageado_input:
     if 'df_express' not in st.session_state:
         df_base = pd.read_csv(arquivo_csv, sep=None, engine='python', dtype=str)
         df_base['Status_Interno'] = "Pendente"
@@ -84,7 +84,7 @@ if arquivo_csv and wa_gestora:
             pdf_bin = exportar_pdf(df_atual, tipo_evento_input, homenageado_input, data_evento.strftime('%d/%m/%Y'))
             st.download_button("📄 SALVAR RELATÓRIO PDF", data=pdf_bin, file_name=f"Relatorio_{homenageado_input}.pdf", mime="application/pdf")
         except:
-            st.info("Aguardando configuração...")
+            st.info("Preencha o nome para habilitar o PDF")
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
@@ -99,9 +99,8 @@ if arquivo_csv and wa_gestora:
             c_st.write("🔴" if status == "Pendente" else "🟢")
             c_nm.markdown(f"**{nome}** \n\n {fone}")
             with c_ac:
-                # MENSAGEM CORRIGIDA: Agora usa a variável tipo_evento_input
-                txt_confirmacao = urllib.parse.quote(f"Confirmo presença no {tipo_evento_input} de {homenageado_input}. Atenciosamente, {nome}")
-                msg_whatsapp = f"Olá {nome}! Você está convidado para o {tipo_evento_input} de {homenageado_input}. Confirme aqui: https://wa.me/{wa_gestora}?text={txt_confirmacao}"
+                confirmacao = urllib.parse.quote(f"Confirmado! Estarei no {tipo_evento_input} de {homenageado_input}. Assinado: {nome}")
+                msg_whatsapp = f"Olá! Segue o convite para o {tipo_evento_input} de {homenageado_input}. Por favor, confirme a sua presença aqui: https://wa.me/{wa_gestora}?text={confirmacao}"
                 link_wa = f"https://web.whatsapp.com/send?phone={fone}&text={urllib.parse.quote(msg_whatsapp)}"
                 
                 ca1, ca2 = st.columns(2)
@@ -113,3 +112,6 @@ if arquivo_csv and wa_gestora:
     if st.button("Limpar Tudo"):
         st.session_state.df_express.iloc[:, -1] = "Pendente"
         st.rerun()
+else:
+    if not wa_gestora or not homenageado_input:
+        st.warning("⚠️ Por favor, preencha o Nome do Homenageado e o WhatsApp da Gestora na barra lateral para começar.")
