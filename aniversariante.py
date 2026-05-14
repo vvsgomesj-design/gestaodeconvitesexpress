@@ -3,115 +3,113 @@ import pandas as pd
 import re
 import urllib.parse
 from fpdf import FPDF
-from datetime import datetime
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO ---
 st.set_page_config(page_title="Gestão de Convites Express", layout="wide")
 
-# --- ESTILIZAÇÃO CSS ---
+# --- ESTILIZAÇÃO ---
 st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
-    .main-title { color: #1a2a6c; font-weight: 800; font-size: 35px; margin-bottom: 20px; }
-    .stButton>button { background-color: #b21f1f; color: white; border-radius: 8px; font-weight: bold; width: 100%; }
-    .pdf-button>button { background-color: #1a2a6c !important; border: 2px solid #fdbb2d !important; color: white !important; }
+    .main-title { color: #1a2a6c; font-weight: 800; font-size: 32px; }
+    .card { background-color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #1a2a6c; margin-bottom: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+    .btn-convite { background-color: #fdbb2d !important; color: #1a2a6c !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
+# --- FUNÇÃO PARA GERAR O CONVITE INDIVIDUAL (PDF) ---
+def gerar_convite_individual(nome_convidado, evento, homenageado, data):
+    pdf = FPDF()
+    pdf.add_page()
+    # Design Simples do Convite
+    pdf.set_fill_color(26, 42, 108)
+    pdf.rect(5, 5, 200, 287, 'D')
+    pdf.set_font('Arial', 'B', 30)
+    pdf.set_text_color(26, 42, 108)
+    pdf.ln(50)
+    pdf.cell(0, 20, evento.upper(), ln=True, align='C')
+    pdf.set_font('Arial', '', 20)
+    pdf.cell(0, 20, f"de {homenageado}", ln=True, align='C')
+    pdf.ln(20)
+    pdf.set_font('Arial', 'B', 25)
+    pdf.set_text_color(178, 31, 31)
+    pdf.cell(0, 20, f"Para: {nome_convidado}", ln=True, align='C')
+    pdf.ln(30)
+    pdf.set_font('Arial', '', 18)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, f"Data: {data}", ln=True, align='C')
+    pdf.cell(0, 10, "Sua presença é fundamental!", ln=True, align='C')
+    return pdf.output(dest='S').encode('latin-1')
+
+# --- INICIALIZAÇÃO ---
+if 'lista_convidados' not in st.session_state:
+    st.session_state.lista_convidados = []
+
+def adicionar_convidado():
+    if st.session_state.temp_nome and st.session_state.temp_fone:
+        st.session_state.lista_convidados.append({
+            "Nome": st.session_state.temp_nome,
+            "Telefone": st.session_state.temp_fone,
+            "Status": "Pendente"
+        })
+        st.session_state.temp_nome = ""
+        st.session_state.temp_fone = ""
 
 def limpar_fone(tel):
     num = re.sub(r'\D', '', str(tel))
     return '55' + num if not num.startswith('55') else num
 
-# --- FUNÇÃO GERADORA DE PDF ---
-def exportar_pdf(df, evento, homenageado, data):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_fill_color(26, 42, 108) 
-    pdf.rect(0, 0, 210, 45, 'F')
-    pdf.set_font('Arial', 'B', 20)
-    pdf.set_text_color(253, 187, 45) 
-    pdf.cell(0, 15, 'GESTÃO DE CONVITES EXPRESS', ln=True, align='C')
-    pdf.set_font('Arial', '', 12)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 10, f'Relatório: {evento} - {homenageado} | Data: {data}', ln=True, align='C')
-    pdf.ln(30)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(85, 10, 'Convidado', 1, 0, 'C', True)
-    pdf.cell(55, 10, 'Telefone', 1, 0, 'C', True)
-    pdf.cell(50, 10, 'Status', 1, 1, 'C', True)
-    pdf.set_font('Arial', '', 10)
-    
-    for i in range(len(df)):
-        nome_pdf = str(df.iloc[i, 0])[:40]
-        fone_pdf = str(df.iloc[i, 1])
-        status_pdf = str(df.iloc[i, -1])
-        pdf.cell(85, 10, nome_pdf, 1)
-        pdf.cell(55, 10, fone_pdf, 1)
-        pdf.cell(50, 10, status_pdf, 1)
-        pdf.ln()
-    return pdf.output(dest='S').encode('latin-1')
-
-# --- CONTEÚDO PRINCIPAL ---
-st.markdown('<p class="main-title">Gestão de Convites Express</p>', unsafe_allow_html=True)
-
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("🎨 Identidade")
-    # Agora os campos começam vazios ("")
-    tipo_evento_input = st.text_input("Qual é o evento?", value="Aniversário")
-    homenageado_input = st.text_input("Homenageado", value="", placeholder="Digite o nome aqui...")
-    wa_gestora = st.text_input("WhatsApp da Gestora", value="", placeholder="55629...")
+    st.header("🎨 Configuração")
+    tipo_evento = st.text_input("Evento", value="Aniversário")
+    homenageado = st.text_input("Homenageado", value="", placeholder="Ex: Luiz")
+    wa_gestora = st.text_input("WhatsApp da Gestora", placeholder="55629...")
     data_evento = st.date_input("Data do Evento")
 
-arquivo_csv = st.file_uploader("📊 Carregue a Lista de Convidados (CSV)", type=["csv"])
+# --- TELA PRINCIPAL ---
+st.markdown('<p class="main-title">Gestão de Convites Express</p>', unsafe_allow_html=True)
 
-if arquivo_csv and wa_gestora and homenageado_input:
-    if 'df_express' not in st.session_state:
-        df_base = pd.read_csv(arquivo_csv, sep=None, engine='python', dtype=str)
-        df_base['Status_Interno'] = "Pendente"
-        st.session_state.df_express = df_base
+# Bloco de Digitação
+with st.container():
+    col1, col2, col3 = st.columns([2, 2, 1])
+    col1.text_input("Nome do Convidado", key="temp_nome")
+    col2.text_input("Telefone com DDD", key="temp_fone")
+    col3.markdown("<br>", unsafe_allow_html=True)
+    col3.button("➕ Adicionar", on_click=adicionar_convidado)
 
-    df_atual = st.session_state.df_express
-    
-    col_met1, col_met2, col_pdf = st.columns([1, 1, 2])
-    col_met1.metric("Pendentes", len(df_atual[df_atual.iloc[:, -1] == "Pendente"]))
-    col_met2.metric("Enviados", len(df_atual[df_atual.iloc[:, -1] == "Enviado"]))
-    
-    with col_pdf:
-        st.markdown('<div class="pdf-button">', unsafe_allow_html=True)
-        try:
-            pdf_bin = exportar_pdf(df_atual, tipo_evento_input, homenageado_input, data_evento.strftime('%d/%m/%Y'))
-            st.download_button("📄 SALVAR RELATÓRIO PDF", data=pdf_bin, file_name=f"Relatorio_{homenageado_input}.pdf", mime="application/pdf")
-        except:
-            st.info("Preencha o nome para habilitar o PDF")
-        st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("---")
 
-    st.markdown("---")
-    
-    for idx in range(len(df_atual)):
-        nome = str(df_atual.iloc[idx, 0]).strip()
-        fone = limpar_fone(df_atual.iloc[idx, 1])
-        status = str(df_atual.iloc[idx, -1])
-        
+# --- EXIBIÇÃO DA LISTA ---
+if st.session_state.lista_convidados:
+    for idx, convidado in enumerate(st.session_state.lista_convidados):
         with st.container():
-            c_st, c_nm, c_ac = st.columns([0.5, 3, 2])
-            c_st.write("🔴" if status == "Pendente" else "🟢")
-            c_nm.markdown(f"**{nome}** \n\n {fone}")
-            with c_ac:
-                confirmacao = urllib.parse.quote(f"Confirmado! Estarei no {tipo_evento_input} de {homenageado_input}. Assinado: {nome}")
-                msg_whatsapp = f"Olá! Segue o convite para o {tipo_evento_input} de {homenageado_input}. Por favor, confirme a sua presença aqui: https://wa.me/{wa_gestora}?text={confirmacao}"
-                link_wa = f"https://web.whatsapp.com/send?phone={fone}&text={urllib.parse.quote(msg_whatsapp)}"
-                
-                ca1, ca2 = st.columns(2)
-                ca1.link_button("🚀 Abrir", link_wa)
-                if status == "Pendente" and ca2.button("Check", key=f"btn_{idx}"):
-                    st.session_state.df_express.iloc[idx, -1] = "Enviado"
+            status_cor = "🔴" if convidado['Status'] == "Pendente" else "🟢"
+            st.markdown(f"""<div class="card"><b>{status_cor} {convidado['Nome']}</b></div>""", unsafe_allow_html=True)
+            
+            c1, c2, c3, c4 = st.columns([2, 1.5, 1, 1])
+            
+            # 1. Gerar e baixar o convite individual
+            if homenageado:
+                pdf_convite = gerar_convite_individual(
+                    convidado['Nome'], tipo_evento, homenageado, data_evento.strftime('%d/%m/%Y')
+                )
+                c1.download_button(f"📥 Baixar Convite", data=pdf_convite, file_name=f"Convite_{convidado['Nome']}.pdf", key=f"pdf_{idx}")
+            
+            # 2. Link WhatsApp
+            if homenageado and wa_gestora:
+                txt_c = urllib.parse.quote(f"Confirmado no {tipo_evento} de {homenageado}. Assinado: {convidado['Nome']}")
+                msg = f"Olá! Segue o seu convite. Confirme aqui: https://wa.me/{wa_gestora}?text={txt_c}"
+                link = f"https://web.whatsapp.com/send?phone={limpar_fone(convidado['Telefone'])}&text={urllib.parse.quote(msg)}"
+                c2.link_button("🚀 Enviar Zap", link)
+            
+            # 3. Check e Excluir
+            if convidado['Status'] == "Pendente":
+                if c3.button("✔", key=f"chk_{idx}"):
+                    st.session_state.lista_convidados[idx]['Status'] = "Enviado"
                     st.rerun()
-
-    if st.button("Limpar Tudo"):
-        st.session_state.df_express.iloc[:, -1] = "Pendente"
-        st.rerun()
+            if c4.button("🗑", key=f"del_{idx}"):
+                st.session_state.lista_convidados.pop(idx)
+                st.rerun()
 else:
-    if not wa_gestora or not homenageado_input:
-        st.warning("⚠️ Por favor, preencha o Nome do Homenageado e o WhatsApp da Gestora na barra lateral para começar.")
+    st.info("Digite os dados acima para gerar os convites!")
