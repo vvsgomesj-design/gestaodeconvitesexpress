@@ -22,7 +22,7 @@ def limpar_fone(tel):
     num = re.sub(r'\D', '', str(tel))
     return '55' + num if not num.startswith('55') else num
 
-# --- FUNÇÃO GERADORA DE PDF (POSICIONAL) ---
+# --- FUNÇÃO GERADORA DE PDF ---
 def exportar_pdf(df, evento, homenageado, data):
     pdf = FPDF()
     pdf.add_page()
@@ -44,11 +44,9 @@ def exportar_pdf(df, evento, homenageado, data):
     pdf.set_font('Arial', '', 10)
     
     for i in range(len(df)):
-        # iloc[linha, coluna] -> 0 é nome, 1 é fone, -1 é o status que criamos
         nome_pdf = str(df.iloc[i, 0])[:40]
         fone_pdf = str(df.iloc[i, 1])
         status_pdf = str(df.iloc[i, -1])
-        
         pdf.cell(85, 10, nome_pdf, 1)
         pdf.cell(55, 10, fone_pdf, 1)
         pdf.cell(50, 10, status_pdf, 1)
@@ -60,8 +58,9 @@ st.markdown('<p class="main-title">Gestão de Convites Express</p>', unsafe_allo
 
 with st.sidebar:
     st.header("🎨 Identidade")
-    tipo_evento = st.text_input("Qual é o evento?", value="Aniversário")
-    homenageado = st.text_input("Homenageado", value="Luiz")
+    # Aqui é onde você define se é Aniversário, Homenagem, etc.
+    tipo_evento_input = st.text_input("Qual é o evento?", value="Aniversário")
+    homenageado_input = st.text_input("Homenageado", value="Luiz")
     wa_gestora = st.text_input("WhatsApp da Gestora (Ex: 55629...)")
     data_evento = st.date_input("Data do Evento")
 
@@ -69,25 +68,23 @@ arquivo_csv = st.file_uploader("📊 Carregue a Lista de Convidados (CSV)", type
 
 if arquivo_csv and wa_gestora:
     if 'df_express' not in st.session_state:
-        # Lê o CSV e adiciona uma coluna de status garantida no final
         df_base = pd.read_csv(arquivo_csv, sep=None, engine='python', dtype=str)
-        df_base['Status_Sistema'] = "Pendente"
+        df_base['Status_Interno'] = "Pendente"
         st.session_state.df_express = df_base
 
     df_atual = st.session_state.df_express
     
     col_met1, col_met2, col_pdf = st.columns([1, 1, 2])
-    # Filtra usando iloc para evitar o KeyError
     col_met1.metric("Pendentes", len(df_atual[df_atual.iloc[:, -1] == "Pendente"]))
     col_met2.metric("Enviados", len(df_atual[df_atual.iloc[:, -1] == "Enviado"]))
     
     with col_pdf:
         st.markdown('<div class="pdf-button">', unsafe_allow_html=True)
         try:
-            pdf_bin = exportar_pdf(df_atual, tipo_evento, homenageado, data_evento.strftime('%d/%m/%Y'))
-            st.download_button("📄 SALVAR RELATÓRIO PDF", data=pdf_bin, file_name=f"Relatorio_{homenageado}.pdf", mime="application/pdf")
+            pdf_bin = exportar_pdf(df_atual, tipo_evento_input, homenageado_input, data_evento.strftime('%d/%m/%Y'))
+            st.download_button("📄 SALVAR RELATÓRIO PDF", data=pdf_bin, file_name=f"Relatorio_{homenageado_input}.pdf", mime="application/pdf")
         except:
-            st.info("Aguardando preenchimento...")
+            st.info("Aguardando configuração...")
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
@@ -102,12 +99,17 @@ if arquivo_csv and wa_gestora:
             c_st.write("🔴" if status == "Pendente" else "🟢")
             c_nm.markdown(f"**{nome}** \n\n {fone}")
             with c_ac:
-                txt_c = urllib.parse.quote(f"Confirmo presença no {tipo_evento} de {homenageado}. Atenciosamente, {nome}")
-                msg_final = f"Olá {nome}! Segue o convite para o evento de {homenageado}. Confirme aqui: https://wa.me/{wa_gestora}?text={txt_c}"
-                link_wa = f"https://web.whatsapp.com/send?phone={fone}&text={urllib.parse.quote(msg_final)}"
+                # MENSAGEM CORRIGIDA: Agora usa a variável tipo_evento_input
+                txt_confirmacao = urllib.parse.quote(f"Confirmo presença no {tipo_evento_input} de {homenageado_input}. Atenciosamente, {nome}")
+                msg_whatsapp = f"Olá {nome}! Você está convidado para o {tipo_evento_input} de {homenageado_input}. Confirme aqui: https://wa.me/{wa_gestora}?text={txt_confirmacao}"
+                link_wa = f"https://web.whatsapp.com/send?phone={fone}&text={urllib.parse.quote(msg_whatsapp)}"
                 
                 ca1, ca2 = st.columns(2)
                 ca1.link_button("🚀 Abrir", link_wa)
                 if status == "Pendente" and ca2.button("Check", key=f"btn_{idx}"):
                     st.session_state.df_express.iloc[idx, -1] = "Enviado"
                     st.rerun()
+
+    if st.button("Limpar Tudo"):
+        st.session_state.df_express.iloc[:, -1] = "Pendente"
+        st.rerun()
